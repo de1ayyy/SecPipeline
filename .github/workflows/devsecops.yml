@@ -1,0 +1,94 @@
+# ──────────────────────────────────────────────────
+# SecPipeline DevSecOps CI/CD 파이프라인
+# 5-Gate 보안 검사 + 빌드 + (향후) 배포 + DAST
+#
+# 학술 근거: Fu et al. (2024), "AI for DevSecOps"
+# 이 파이프라인은 논문의 5단계 프레임워크
+# (Code Commit → Build → Test → Deploy → Monitor)를 구현한다.
+# ──────────────────────────────────────────────────
+
+name: SecPipeline DevSecOps
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Gate 1: Secret Scan (Gitleaks) ──────────────
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Gate 2: Dependency Scan (pip-audit) ─────────
+  dependency-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt --format json --output dep-scan.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-scan
+          path: dep-scan.json
+
+  # ── Gate 3: SAST (Semgrep + Bandit) ─────────────
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          pip install semgrep bandit
+          semgrep scan --config auto --config .semgrep/ app/ --json --output semgrep.json || true
+          bandit -r app/ -f json -o bandit.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sast-results
+          path: |
+            semgrep.json
+            bandit.json
+
+  # ── Gate 4: Build + Container Scan (Trivy) ──────
+  build-and-scan:
+    runs-on: ubuntu-latest
+    needs: [secret-scan, dependency-scan, sast]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t studylog:${{ github.sha }} .
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: studylog:${{ github.sha }}
+          format: json
+          output: trivy.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-results
+          path: trivy.json
+
+  # ── Gate 5: Dockerfile Lint (hadolint) ──────────
+  dockerfile-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: Dockerfile

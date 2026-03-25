@@ -1,0 +1,29 @@
+# ──────────────────────────────────────────────────
+# Semgrep 커스텀 규칙
+# Gate 3: SAST에서 --config .semgrep/ 로 로드
+# VULN-03b (XSS/SSTI via render_template_string) 탐지용
+# ──────────────────────────────────────────────────
+
+rules:
+  - id: flask-render-template-string-xss
+    patterns:
+      - pattern: |
+          render_template_string($TMPL, ...)
+      - pattern-not: |
+          render_template_string("...", ...)
+    message: >
+      render_template_string()에 동적으로 생성된 문자열이 전달되고 있습니다.
+      사용자 입력이 포함되면 XSS 또는 SSTI(Server-Side Template Injection)가
+      발생할 수 있습니다. render_template()를 사용하거나 Jinja2 변수
+      바인딩({{ variable }})을 사용하세요.
+    languages: [python]
+    severity: WARNING
+    metadata:
+      cwe:
+        - "CWE-79: Improper Neutralization of Input During Web Page Generation"
+        - "CWE-1336: Improper Neutralization of Special Elements Used in a Template Engine"
+      owasp:
+        - "A03:2025 Cross-Site Scripting (XSS)"
+      references:
+        - https://owasp.org/Top10/2025/A03_2025-Cross-Site_Scripting/
+      confidence: MEDIUM

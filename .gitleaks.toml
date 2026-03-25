@@ -1,0 +1,17 @@
+# ──────────────────────────────────────────────────
+# Gitleaks 설정 파일
+# Gate 1: Secret Scan에서 사용
+# 기본 규칙을 확장하고, 오탐 발생 경로를 allowlist로 제외
+# ──────────────────────────────────────────────────
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist – 오탐 제외 경로"
+paths = [
+    '''venv/''',
+    '''\.env\.example''',
+    '''tests/fixtures/''',
+    '''docs/'''
+]
