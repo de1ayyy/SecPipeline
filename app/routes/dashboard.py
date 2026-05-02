@@ -47,14 +47,15 @@ def dashboard():
 
     db.close()
 
-    # ❌ VULN-03b: f-string으로 사용자명을 HTML에 직접 삽입 후 render_template_string()에 전달
-    header = f'''<!DOCTYPE html>
+    # ✅ Fix-03b: Jinja2 템플릿 변수를 사용하여 자동 이스케이프 적용
+    header = '''<!DOCTYPE html>
 <html><head><title>대시보드</title></head>
 <body>
-  <h2>{username}님의 대시보드</h2>'''
+  <h2>{{ username }}님의 대시보드</h2>'''
 
     return render_template_string(
         header + DASHBOARD_BODY,
+        username=username,
         total_logs=total_logs,
         total_hours=total_hours,
         total_subjects=total_subjects

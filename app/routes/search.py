@@ -52,9 +52,11 @@ def search():
 
     if keyword:
         db = get_db()
-        # ❌ VULN-03a: f-string으로 사용자 입력을 SQL에 직접 삽입
-        query = f"SELECT * FROM study_logs WHERE title LIKE '%{keyword}%' AND user_id = {session['user_id']}"
-        results = db.execute(query).fetchall()
+        # ✅ Fix-03a: 파라미터 바인딩(?) 사용으로 SQL Injection 방어
+        results = db.execute(
+            "SELECT * FROM study_logs WHERE title LIKE ? AND user_id = ?",
+            (f"%{keyword}%", session['user_id'])
+        ).fetchall()
         db.close()
 
     return render_template_string(SEARCH_HTML, keyword=keyword, results=results)

@@ -1,3 +1,3 @@
 import os
-SECRET_KEY = "fl4sk_s3cr3t_8Kx9Qm2vPwLnR7jY5tZa"   # VULN-01: 하드코딩된 시크릿
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-fallback-secret-key-1234")   # ✅ Fix-01: 환경변수 분리
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), '..', 'studylog.db')
