@@ -1,0 +1,18 @@
+<nav class="navbar">
+    <div class="navbar-container">
+        <a href="{{ url_for('studylog.list_logs') if session.user_id else '/' }}" class="navbar-brand">SecPipeline</a>
+        <div class="navbar-nav">
+            {% if session.user_id %}
+                <span style="margin-right:15px; color:var(--brand-500); font-weight:600;">{{ session.username }}님</span>
+                <a href="{{ url_for('studylog.list_logs') }}">기록</a>
+                <a href="{{ url_for('subjects.list_subjects') }}">과목</a>
+                <a href="{{ url_for('search.search') }}">검색</a>
+                <a href="{{ url_for('dashboard.dashboard') }}">대시보드</a>
+                <a href="{{ url_for('auth.logout') }}">로그아웃</a>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}">로그인</a>
+                <a href="{{ url_for('auth.register') }}">회원가입</a>
+            {% endif %}
+        </div>
+    </div>
+</nav>

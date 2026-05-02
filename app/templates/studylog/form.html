@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ '기록 수정' if log else '새 기록 작성' }}{% endblock %}
+{% block content %}
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <!-- 작성 폼 -->
+    <div class="card">
+        <h2 style="margin-top:0; color:var(--brand-700);">{{ '기록 수정' if log else '새 기록 작성' }}</h2>
+        
+        <form method="post">
+            <label style="font-weight:600; display:block; margin-bottom:8px;">제목</label>
+            <input class="form-control" name="title" placeholder="무엇을 공부하셨나요?" value="{{ log['title'] if log else '' }}" required>
+            
+            <label style="font-weight:600; display:block; margin-bottom:8px;">내용 (마크다운 지원)</label>
+            <textarea class="form-control" id="contentInput" name="content" placeholder="**굵게** *기울임* 지원" rows="8" oninput="updatePreview()">{{ log['content'] if log else '' }}</textarea>
+            
+            <label style="font-weight:600; display:block; margin-bottom:8px;">학습 시간 (시간)</label>
+            <!-- F6: 빠른 칩 + 시간 슬라이더 -->
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <button type="button" class="btn btn-sm tag-chip" onclick="setHours(0.5)">30분</button>
+                <button type="button" class="btn btn-sm tag-chip" onclick="setHours(1)">1시간</button>
+                <button type="button" class="btn btn-sm tag-chip" onclick="setHours(2)">2시간</button>
+                <button type="button" class="btn btn-sm tag-chip" onclick="setHours(3)">3시간</button>
+            </div>
+            <div style="display:flex; align-items:center; gap:15px; margin-bottom:15px;">
+                <input type="range" id="hoursSlider" min="0" max="12" step="0.5" value="{{ log['hours'] if log else '1' }}" oninput="syncSlider()" style="flex:1;">
+                <input class="form-control" id="hoursInput" name="hours" type="number" step="0.5" value="{{ log['hours'] if log else '1' }}" oninput="syncInput()" style="width:80px; margin-bottom:0;" required>
+            </div>
+            
+            <label style="font-weight:600; display:block; margin-bottom:8px;">과목 선택 (선택사항)</label>
+            <select class="form-control" name="subject_id">
+                <option value="">-- 과목을 선택하세요 --</option>
+                {% for s in subjects %}
+                <option value="{{ s['id'] }}" {{ 'selected' if log and log['subject_id'] == s['id'] else '' }}>{{ s['name'] }}</option>
+                {% endfor %}
+            </select>
+            
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button type="submit" class="btn btn-primary" style="flex:1;">저장하기</button>
+                <a href="{{ url_for('studylog.list_logs') }}" class="btn" style="background:var(--line); color:var(--ink-900); text-align:center; padding:10px;">취소</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- F13: 마크다운 미리보기 영역 -->
+    <div class="card" style="background:var(--bg);">
+        <h4 style="margin-top:0; color:var(--ink-500);">👁️ 미리보기</h4>
+        <div id="previewArea" style="min-height: 200px; padding:15px; background:var(--surface); border-radius:var(--radius); border:1px solid var(--line); white-space:pre-wrap;">
+        </div>
+    </div>
+</div>
+
+<script>
+function setHours(h) {
+    document.getElementById('hoursInput').value = h;
+    document.getElementById('hoursSlider').value = h;
+}
+function syncSlider() {
+    document.getElementById('hoursInput').value = document.getElementById('hoursSlider').value;
+}
+function syncInput() {
+    document.getElementById('hoursSlider').value = document.getElementById('hoursInput').value;
+}
+function updatePreview() {
+    let text = document.getElementById('contentInput').value;
+    // 간단한 XSS 방어 (태그 무효화) 후 마크다운 변환
+    text = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    text = text.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" style="color:var(--brand-500);">$1</a>');
+    document.getElementById('previewArea').innerHTML = text;
+}
+// 초기 로드 시 반영
+updatePreview();
+</script>
+{% endblock %}

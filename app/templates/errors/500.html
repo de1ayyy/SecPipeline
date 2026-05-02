@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}서버 오류 - 500{% endblock %}
+{% block content %}
+<div class="empty-state">
+    <h1 style="font-size: 5rem; color: var(--danger-500); margin:0;">500</h1>
+    <h2>서버에 일시적인 오류가 발생했습니다.</h2>
+    <p>불편을 드려 죄송합니다. 잠시 후 다시 시도해 주세요.</p>
+    <br>
+    <a href="{{ url_for('studylog.list_logs') if session.user_id else '/' }}" class="btn btn-primary">홈으로 돌아가기</a>
+</div>
+{% endblock %}

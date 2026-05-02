@@ -2,6 +2,7 @@ from flask import Flask
 from app.config import SECRET_KEY
 from app.models import init_db
 from app.logger import setup_logger
+from flask import render_template
 
 
 def create_app():
@@ -30,6 +31,15 @@ def create_app():
 
     # 로깅 시스템 초기화
     setup_logger(app)
+
+    # 에러 핸들러 등록
+    @app.errorhandler(404)
+    def page_not_found(e):
+        return render_template('errors/404.html'), 404
+
+    @app.errorhandler(500)
+    def internal_server_error(e):
+        return render_template('errors/500.html'), 500
 
     # Docker HEALTHCHECK 및 Render 헬스체크용
     @app.route('/health')
