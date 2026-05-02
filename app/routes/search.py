@@ -1,35 +1,7 @@
-from flask import Blueprint, request, session, redirect, url_for, render_template_string
+from flask import Blueprint, request, session, redirect, url_for, render_template
 from app.models import get_db
 
 search_bp = Blueprint('search', __name__)
-
-# ── HTML 템플릿 ───────────────────────────────────
-SEARCH_HTML = '''
-<!DOCTYPE html>
-<html><head><title>검색</title></head>
-<body>
-  <h1>🔍 학습 기록 검색</h1>
-  <a href="{{ url_for('studylog.list_logs') }}">← 학습 기록</a>
-  <hr>
-  <form method="get">
-    <input name="q" placeholder="검색어 입력" value="{{ keyword or '' }}" required>
-    <button type="submit">검색</button>
-  </form>
-  <hr>
-  {% if results is not none %}
-    <p>검색 결과: {{ results|length }}건</p>
-    {% for log in results %}
-    <div style="border:1px solid #ccc; padding:10px; margin:10px 0;">
-      <h3>{{ log['title'] }}</h3>
-      <p>{{ log['content'] or '' }}</p>
-      <small>{{ log['hours'] }}시간 | {{ log['created_at'] }}</small>
-    </div>
-    {% else %}
-    <p>검색 결과가 없습니다.</p>
-    {% endfor %}
-  {% endif %}
-</body></html>
-'''
 
 
 # ── 라우트 ────────────────────────────────────────
@@ -59,4 +31,4 @@ def search():
         ).fetchall()
         db.close()
 
-    return render_template_string(SEARCH_HTML, keyword=keyword, results=results)
+    return render_template('search.html', keyword=keyword, results=results)

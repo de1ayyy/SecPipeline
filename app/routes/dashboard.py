@@ -1,19 +1,8 @@
-from flask import Blueprint, session, redirect, url_for, render_template_string
+from flask import Blueprint, session, redirect, url_for, render_template
 from app.models import get_db
+from app.services.stats import get_summary, get_weekly_hours, get_subject_distribution, get_recent_logs
 
 dashboard_bp = Blueprint('dashboard', __name__)
-
-# ── HTML 템플릿 본문 (헤더 제외) ──────────────────
-DASHBOARD_BODY = '''
-  <a href="{{ url_for('studylog.list_logs') }}">← 학습 기록</a>
-  <hr>
-  <table border="1" cellpadding="8" cellspacing="0">
-    <tr><td>총 기록 수</td><td><strong>{{ total_logs }}건</strong></td></tr>
-    <tr><td>총 학습 시간</td><td><strong>{{ total_hours }}시간</strong></td></tr>
-    <tr><td>등록 과목 수</td><td><strong>{{ total_subjects }}개</strong></td></tr>
-  </table>
-</body></html>
-'''
 
 
 @dashboard_bp.route('/dashboard')
@@ -33,30 +22,17 @@ def dashboard():
     user_id = session['user_id']
     username = session['username']
 
-    total_logs = db.execute(
-        'SELECT COUNT(*) as cnt FROM study_logs WHERE user_id = ?', (user_id,)
-    ).fetchone()['cnt']
+    # 기존 통계 쿼리를 stats.py 서비스 계층으로 분리 (로직 보존)
+    stats = {
+        'summary': get_summary(user_id),
+        'weekly': get_weekly_hours(user_id),
+        'distribution': get_subject_distribution(user_id),
+        'recent_logs': get_recent_logs(user_id)
+    }
 
-    total_hours = db.execute(
-        'SELECT COALESCE(SUM(hours), 0) as total FROM study_logs WHERE user_id = ?', (user_id,)
-    ).fetchone()['total']
-
-    total_subjects = db.execute(
-        'SELECT COUNT(*) as cnt FROM subjects WHERE user_id = ?', (user_id,)
-    ).fetchone()['cnt']
-
-    db.close()
-
-    # ✅ Fix-03b: Jinja2 템플릿 변수를 사용하여 자동 이스케이프 적용
-    header = '''<!DOCTYPE html>
-<html><head><title>대시보드</title></head>
-<body>
-  <h2>{{ username }}님의 대시보드</h2>'''
-
-    return render_template_string(
-        header + DASHBOARD_BODY,
+    # ✅ Fix-03b 패턴 보존 (HTML을 dashboard.html로 분리)
+    return render_template(
+        'dashboard.html',
         username=username,
-        total_logs=total_logs,
-        total_hours=total_hours,
-        total_subjects=total_subjects
+        stats=stats
     )

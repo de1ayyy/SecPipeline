@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}검색 결과{% endblock %}
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto;">
+    <h2 style="color:var(--brand-700);">🔍 기록 검색</h2>
+    
+    <div class="card" style="margin-bottom: 30px;">
+        <form method="get" style="display:flex; gap:10px;">
+            <input class="form-control" name="q" placeholder="검색어를 입력하세요" value="{{ keyword or '' }}" style="margin-bottom:0;" required>
+            <button type="submit" class="btn btn-primary" style="white-space:nowrap;">검색</button>
+        </form>
+    </div>
+
+    {% if results is not none %}
+        <h3 style="color:var(--ink-900);">검색 결과: <span style="color:var(--brand-500);">{{ results|length }}</span>건</h3>
+        
+        {% if results|length == 0 %}
+        <div class="empty-state card">
+            <h4 style="margin:0;">"{{ keyword }}"에 대한 검색 결과가 없습니다.</h4>
+        </div>
+        {% else %}
+        <div style="display:flex; flex-direction:column; gap:15px;">
+            {% for log in results %}
+            <div class="card" style="padding:15px;">
+                <h4 style="margin-top:0; margin-bottom:8px; color:var(--ink-900);">{{ log['title'] }}</h4>
+                <p style="color:var(--ink-500); font-size:0.95rem; margin-bottom:10px;">{{ log['content'] or '내용 없음' }}</p>
+                <div style="font-size:0.85rem; color:var(--ink-500);">
+                    <span style="font-weight:bold; color:var(--brand-500);">⏱ {{ log['hours'] }}시간</span> | {{ log['created_at'] }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

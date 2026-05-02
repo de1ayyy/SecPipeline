@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}학습 기록{% endblock %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <h2 style="margin:0; color:var(--brand-700);">📚 내 학습 기록</h2>
+    <a href="{{ url_for('studylog.create_log') }}" class="btn btn-primary">+ 새 기록 작성</a>
+</div>
+
+<!-- F5: 정렬 및 필터 -->
+<div class="card" style="margin-bottom:20px; padding:15px; display:flex; gap:15px; align-items:center;">
+    <span style="font-weight:600; color:var(--ink-500);">필터:</span>
+    <select class="form-control" style="width:auto; margin-bottom:0;" onchange="alert('필터 기능은 백엔드 연결 후 활성화됩니다.')">
+        <option>모든 과목</option>
+    </select>
+    <span style="font-weight:600; color:var(--ink-500); margin-left:auto;">정렬:</span>
+    <select class="form-control" style="width:auto; margin-bottom:0;" onchange="alert('정렬 기능은 백엔드 연결 후 활성화됩니다.')">
+        <option>최신순</option>
+        <option>오래된순</option>
+        <option>학습시간 많은순</option>
+    </select>
+</div>
+
+{% if not logs %}
+<div class="empty-state card">
+    <h3 style="color:var(--ink-900);">아직 작성된 학습 기록이 없습니다.</h3>
+    <p>첫 번째 학습 기록을 남겨보세요!</p>
+</div>
+{% else %}
+<div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+    {% for log in logs %}
+    <div class="card" style="display:flex; flex-direction:column; justify-content:space-between;">
+        <div>
+            <h3 style="margin-top:0; margin-bottom:10px; color:var(--ink-900);">{{ log['title'] }}</h3>
+            <p style="color:var(--ink-500); font-size:0.95rem; margin-bottom:15px; white-space:pre-wrap;">{{ log['content'] or '내용 없음' }}</p>
+        </div>
+        <div style="border-top:1px solid var(--line); padding-top:10px; font-size:0.85rem; color:var(--ink-500);">
+            <span style="font-weight:bold; color:var(--brand-500);">⏱ {{ log['hours'] }}시간</span> | {{ log['created_at'] }}
+            <div style="margin-top:10px; display:flex; gap:10px;">
+                <a href="{{ url_for('studylog.edit_log', log_id=log['id']) }}" class="btn btn-sm" style="background:var(--line); color:var(--ink-900);">수정</a>
+                <form method="post" action="{{ url_for('studylog.delete_log', log_id=log['id']) }}" style="margin:0;">
+                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('정말 삭제하시겠습니까?')">삭제</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
