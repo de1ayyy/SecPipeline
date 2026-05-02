@@ -1,6 +1,7 @@
 from flask import Flask
 from app.config import SECRET_KEY
 from app.models import init_db
+from app.logger import setup_logger
 
 
 def create_app():
@@ -26,6 +27,9 @@ def create_app():
     app.register_blueprint(search_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(export_bp)
+
+    # 로깅 시스템 초기화
+    setup_logger(app)
 
     # Docker HEALTHCHECK 및 Render 헬스체크용
     @app.route('/health')
