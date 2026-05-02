@@ -22,6 +22,9 @@ USER appuser
 
 EXPOSE 5000
 
+# ✅ Fix-05: 컨테이너 내에서 DB 파일을 누구나 쓰기 가능한 /tmp 경로에 생성하도록 환경변수 설정
+ENV DATABASE_PATH=/tmp/studylog.db
+
 # ✅ Fix-05: 컨테이너 상태 모니터링을 위한 HEALTHCHECK
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:5000/health || exit 1
