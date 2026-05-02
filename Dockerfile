@@ -5,6 +5,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # ✅ Fix-05: Non-root 권한 분리용 사용자 생성 및 curl 설치 (Healthcheck 용도)
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && adduser --disabled-password --gecos "" appuser
