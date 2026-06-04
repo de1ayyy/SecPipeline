@@ -219,3 +219,6 @@ data/requests.csv
 # OS / 에디터 부산물
 .DS_Store
 ~$*.docx
+
+# 보고서 그림 자동생성물(재생성 가능)
+docs/figures/
