@@ -155,14 +155,24 @@ jobs:
         with:
           dockerfile: Dockerfile
 
-  # ── Deploy: Render Webhook 배포 ─────────────────
+  # ── Deploy: Render 배포 ─────────────────────────
+  # Render는 GitHub 연동으로 main push 시 자동 배포된다. 아래 Deploy Hook 호출은
+  # 보조 트리거이며, 훅 미설정/오류여도 자동 배포가 동작하므로 잡을 실패시키지 않는다.
   deploy:
     runs-on: ubuntu-latest
     needs: [unit-test, build-and-scan, dockerfile-lint]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-      - name: Trigger Render Deploy
-        run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+      - name: Trigger Render Deploy (optional hook; GitHub auto-deploy is primary)
+        run: |
+          HOOK="${{ secrets.RENDER_DEPLOY_HOOK }}"
+          if [ -n "$HOOK" ]; then
+            curl -fsS --max-time 30 -X POST "$HOOK" \
+              && echo "Deploy hook triggered." \
+              || echo "Deploy hook unreachable — relying on Render GitHub auto-deploy."
+          else
+            echo "No RENDER_DEPLOY_HOOK set — relying on Render GitHub auto-deploy."
+          fi
 
   # ── Gate 7: DAST (OWASP ZAP) - 운영 환경 동적 스캔 ──
   dast:
