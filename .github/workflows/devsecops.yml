@@ -14,6 +14,13 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # 수동 재학습 트리거 (MLOps): 데이터/피처 변경 후 v2 모델 생성용
+  workflow_dispatch:
+    inputs:
+      data_version:
+        description: "데이터/모델 버전 태그 (v2면 추가 공격 변형 포함)"
+        default: "v2"
+        type: string
 
 jobs:
   # ── Gate 1: Secret Scan (Gitleaks) ──────────────
@@ -94,10 +101,11 @@ jobs:
           python-version: "3.12"
       - name: Install dependencies
         run: pip install -r requirements.txt
+      # push/PR는 v1, 수동 재학습(workflow_dispatch)은 입력값(기본 v2)
       - name: Seed synthetic request data
-        run: python scripts/seed_attacks.py
+        run: python scripts/seed_attacks.py --version "${{ github.event.inputs.data_version || 'v1' }}"
       - name: Train models + MLflow logging
-        run: python -m app.ml.train
+        run: python -m app.ml.train --version "${{ github.event.inputs.data_version || 'v1' }}"
       - name: Model quality gate (macro-F1 >= 0.80)
         run: python scripts/eval_gate.py
       - uses: actions/upload-artifact@v4

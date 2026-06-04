@@ -1,5 +1,5 @@
 {
-  "data_version": "v1",
+  "data_version": "v2",
   "winner": "logreg",
   "macro_f1": 1.0,
   "accuracy": 1.0,
@@ -18,8 +18,8 @@
     },
     {
       "model_type": "nb",
-      "macro_f1": 0.9797756327454066,
-      "accuracy": 0.98
+      "macro_f1": 0.9899335232668566,
+      "accuracy": 0.99
     }
   ]
 }
