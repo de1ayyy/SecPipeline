@@ -130,7 +130,8 @@ C(P("※ 그림 11(혼동행렬)은 학습 시 실제로 저장된 artifact라�
 C(P("사전 준비 (모든 명령은 프로젝트 루트에서 실행):", { bold: true }));
 C(mono("$ cd ~/Desktop/SecPipeline        # 프로젝트 폴더로 이동"));
 C(mono("$ source venv/bin/activate         # 가상환경 활성화 (Windows: venv\\Scripts\\activate)"));
-C(mono("$ pip install -r requirements.txt  # 최초 1회 의존성 설치", { after: 120 }));
+C(mono("$ pip install -r requirements.txt  # 최초 1회 의존성 설치", { after: 40 }));
+C(P("※ 포트 주의(macOS): `python run.py`나 도커 실행 시 5000 포트가 ‘address already in use’로 막히면, AirPlay 수신 기능이 5000을 쓰는 것이다. 시스템 설정 > 일반 > AirDrop 및 Handoff에서 ‘AirPlay 수신기’를 끄거나, 도커는 -p 5055:5000으로 띄워 http://localhost:5055 로 접속하면 된다.", { size: 19, color: "7A5600" }));
 
 // ════════════ 1. 프로젝트 개요 ════════════
 C(H1("1. 프로젝트 개요"));
@@ -143,10 +144,12 @@ C(bullet("GitHub 주소(public): " + REPO + "   (Pull Request: " + PR + ")"));
 C(bullet("배포 주소: https://secpipeline.onrender.com"));
 C(bullet("MLflow Tracking 화면: 로컬 파일 백엔드(mlruns/). 아래 그림 2의 명령으로 UI 실행."));
 C(...fig({
-  caption: "Render에 배포되어 외부에서 접속되는 SecPipeline 서비스",
-  cmd: ["브라우저 주소창에 https://secpipeline.onrender.com 입력"],
-  where: "배포된 서비스의 로그인 또는 대시보드 페이지",
-  shot: "서비스 화면 전체 + 브라우저 주소창(secpipeline.onrender.com 도메인이 보이도록)",
+  caption: "Render에 배포되어 외부에서 접속되는 SecPipeline 서비스(로그인 페이지)",
+  cmd: ["브라우저 주소창에 https://secpipeline.onrender.com/login 입력",
+        "# 참고: 루트(/)는 라우트가 없어 404가 정상. /login 또는 /health(JSON)로 접속"],
+  where: "배포된 서비스의 로그인 페이지(/login)",
+  shot: "로그인 화면 전체 + 브라우저 주소창(secpipeline.onrender.com/login 이 보이도록). " +
+        "추가로 https://secpipeline.onrender.com/health 의 {\"status\":\"ok\"} 화면을 한 장 더 찍으면 ‘서비스 상태 확인’ 증빙으로 좋다.",
   why: "외부에서 접근 가능한 형태로 서비스가 실제 배포·운영되고 있음을 증빙",
   score: "배포 및 운영(5), MLOps 파이프라인 완성도(35) 일부",
 }));
@@ -274,8 +277,9 @@ C(...fig({
 }));
 C(...fig({
   caption: "컨테이너 실행 후 악성 요청 탐지 로그(SECURITY ALERT)",
-  cmd: ["docker rm -f sp 2>/dev/null; docker run -d --name sp -p 5000:5000 studylog",
-        "curl \"http://localhost:5000/search?q=%27%20OR%201%3D1--\"",
+  cmd: ["docker rm -f sp 2>/dev/null; docker run -d --name sp -p 5055:5000 studylog",
+        "# (호스트 포트 5055 사용 — macOS는 5000을 AirPlay가 점유할 수 있음)",
+        "curl \"http://localhost:5055/search?q=%27%20OR%201%3D1--\"",
         "docker logs sp | grep \"SECURITY ALERT\""],
   where: "터미널 출력",
   shot: "SECURITY ALERT [sqli] … 로그 라인",
