@@ -6,3 +6,6 @@ docs
 tests
 *.db
 .env
+mlruns
+data
+.pytest_cache
