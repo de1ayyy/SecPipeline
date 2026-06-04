@@ -64,6 +64,44 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- 보안 ML 탐지 위젯 (MLSecOps) -->
+    <div class="card" style="margin-top:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h4 style="margin:0; color:var(--ink-900);">🛡️ 보안 이벤트 (악성 요청 탐지)</h4>
+            {% if stats.security.enabled %}
+                <span style="font-size:0.8rem; color:var(--accent-500); font-weight:600;">● 모델 활성</span>
+            {% else %}
+                <span style="font-size:0.8rem; color:var(--ink-500);">○ 모델 미로드 (탐지 비활성)</span>
+            {% endif %}
+        </div>
+
+        <div style="display:flex; gap:30px; flex-wrap:wrap; margin-bottom:15px;">
+            <div>
+                <span style="color:var(--ink-500); font-size:0.85rem;">누적 탐지</span>
+                <h2 style="margin:4px 0 0 0; color:var(--warn-500);">{{ stats.security.total_alerts }}건</h2>
+            </div>
+            {% for cat, cnt in stats.security.by_category.items() %}
+            <div>
+                <span style="color:var(--ink-500); font-size:0.85rem;">{{ cat }}</span>
+                <h3 style="margin:4px 0 0 0; color:var(--ink-900);">{{ cnt }}</h3>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if stats.security.recent %}
+        <div style="display:flex; flex-direction:column; gap:8px;">
+            {% for ev in stats.security.recent %}
+            <div style="padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:0.82rem; display:flex; justify-content:space-between; gap:10px;">
+                <span><strong style="color:var(--warn-500);">{{ ev.label }}</strong> · {{ ev.method }} {{ ev.path }}</span>
+                <span style="color:var(--ink-500);">conf {{ ev.confidence }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--ink-500); text-align:center; padding:10px 0; margin:0;">탐지된 악성 요청이 없습니다.</p>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}
 
