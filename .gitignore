@@ -215,3 +215,7 @@ mlruns/
 # 합성 학습 데이터: scripts/seed_attacks.py로 재생성 (커밋 불필요)
 data/requests.csv
 # 참고: models/attack_clf.pkl 은 의도적으로 추적함 (Docker COPY 대상)
+
+# OS / 에디터 부산물
+.DS_Store
+~$*.docx
