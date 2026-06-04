@@ -7,7 +7,10 @@ pytest-cov
 httpx
 
 # ── ML / MLOps (악성 요청 탐지 + MLflow) ──
-scikit-learn>=1.5.0
-mlflow>=2.18.0
-pandas>=2.2.0
-joblib>=1.4.0
+# 재현성을 위해 검증 완료된 버전으로 고정(pin). matplotlib은 train.py에서 직접
+# import하므로(혼동행렬) mlflow 의존에 기대지 않고 명시적으로 핀한다.
+scikit-learn==1.9.0
+mlflow==3.13.0
+pandas==2.3.3
+joblib==1.5.3
+matplotlib==3.10.9
