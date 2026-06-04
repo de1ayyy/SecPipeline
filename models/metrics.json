@@ -1,0 +1,25 @@
+{
+  "data_version": "v2",
+  "winner": "logreg",
+  "macro_f1": 1.0,
+  "accuracy": 1.0,
+  "per_class_f1": {
+    "benign": 1.0,
+    "sqli": 1.0,
+    "xss": 1.0,
+    "path_traversal": 1.0,
+    "cmdi": 1.0
+  },
+  "candidates": [
+    {
+      "model_type": "logreg",
+      "macro_f1": 1.0,
+      "accuracy": 1.0
+    },
+    {
+      "model_type": "nb",
+      "macro_f1": 0.9899335232668566,
+      "accuracy": 0.99
+    }
+  ]
+}

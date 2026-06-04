@@ -25,6 +25,12 @@ EXPOSE 5000
 # ✅ Fix-05: 컨테이너 내에서 DB 파일을 누구나 쓰기 가능한 /tmp 경로에 생성하도록 환경변수 설정
 ENV DATABASE_PATH=/tmp/studylog.db
 
+# ── 보안 ML(MLSecOps): 모델 경로 + 탐지 모드 ──
+# models/attack_clf.pkl 은 COPY로 이미지에 포함된다(CI 게이트 통과 모델).
+# DETECTOR_MODE=shadow: 탐지·로깅만(기본). enforce로 바꾸면 악성 요청 403 차단.
+ENV MODEL_PATH=/app/models/attack_clf.pkl
+ENV DETECTOR_MODE=shadow
+
 # ✅ Fix-05: 컨테이너 상태 모니터링을 위한 HEALTHCHECK
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:5000/health || exit 1

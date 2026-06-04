@@ -208,3 +208,17 @@ __marimo__/
 
 #추가
 studylog.db
+
+# ── ML / MLOps ──
+# MLflow tracking 산출물: 레포에 커밋하지 않고 CI artifact/이미지로 전달
+mlruns/
+# 합성 학습 데이터: scripts/seed_attacks.py로 재생성 (커밋 불필요)
+data/requests.csv
+# 참고: models/attack_clf.pkl 은 의도적으로 추적함 (Docker COPY 대상)
+
+# OS / 에디터 부산물
+.DS_Store
+~$*.docx
+
+# 보고서 그림 자동생성물(재생성 가능)
+docs/figures/

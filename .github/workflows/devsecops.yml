@@ -14,6 +14,13 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # 수동 재학습 트리거 (MLOps): 데이터/피처 변경 후 v2 모델 생성용
+  workflow_dispatch:
+    inputs:
+      data_version:
+        description: "데이터/모델 버전 태그 (v2면 추가 공격 변형 포함)"
+        default: "v2"
+        type: string
 
 jobs:
   # ── Gate 1: Secret Scan (Gitleaks) ──────────────
@@ -82,12 +89,49 @@ jobs:
           path: test-results.xml
 
 
+  # ── MLSecOps: 보안 ML 학습 + 품질 게이트 ─────────
+  # 합성 데이터 생성 → 학습(MLflow 로깅) → macro-F1 품질 게이트 → 모델 artifact 업로드.
+  # 기존 5-Gate 보안 잡은 그대로 두고 ML 단계만 추가한다(DevSecOps + MLOps 통합).
+  ml-train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      # push/PR는 v1, 수동 재학습(workflow_dispatch)은 입력값(기본 v2)
+      - name: Seed synthetic request data
+        run: python scripts/seed_attacks.py --version "${{ github.event.inputs.data_version || 'v1' }}"
+      - name: Train models + MLflow logging
+        run: python -m app.ml.train --version "${{ github.event.inputs.data_version || 'v1' }}"
+      - name: Model quality gate (macro-F1 >= 0.80)
+        run: python scripts/eval_gate.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ml-model
+          path: |
+            models/attack_clf.pkl
+            models/metrics.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mlflow-runs
+          path: mlruns/
+
   # ── Gate 4: Build + Container Scan (Trivy) ──────
   build-and-scan:
     runs-on: ubuntu-latest
-    needs: [secret-scan, dependency-scan, sast, unit-test]
+    needs: [secret-scan, dependency-scan, sast, unit-test, ml-train]
     steps:
       - uses: actions/checkout@v4
+      # 게이트를 통과한 CI 학습 모델을 내려받아 이미지에 포함
+      - uses: actions/download-artifact@v4
+        with:
+          name: ml-model
+          path: models
       - run: docker build -t studylog:${{ github.sha }} .
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@v0.35.0

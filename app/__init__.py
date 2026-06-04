@@ -1,8 +1,10 @@
-from flask import Flask
+from flask import Flask, abort, request
 from app.config import SECRET_KEY
 from app.models import init_db
 from app.logger import setup_logger
 from flask import render_template
+from app.ml.config import DETECTOR_MODE
+from app.ml import detector
 
 
 def create_app():
@@ -31,6 +33,27 @@ def create_app():
 
     # 로깅 시스템 초기화
     setup_logger(app)
+
+    # ── 보안 ML 미들웨어: 매 요청을 악성 여부로 스코어링 (MLSecOps) ──
+    # 기본 shadow 모드: 탐지·로깅만. DETECTOR_MODE=enforce면 403 차단.
+    # 모델이 없으면 detector가 graceful fallback(탐지 비활성)하므로 앱은 정상 동작.
+    @app.before_request
+    def detect_malicious_request():
+        query = request.query_string.decode("utf-8", "ignore")
+        try:
+            body = request.get_data(as_text=True)[:2000]
+        except Exception:
+            body = ""
+        label, confidence = detector.classify_request(
+            request.method, request.path, query, body)
+        if detector.is_attack(label, confidence):
+            detector.record_event(label, confidence, request.method, request.path)
+            app.logger.warning(
+                "SECURITY ALERT [%s] conf=%.3f mode=%s %s %s from=%s",
+                label, confidence, DETECTOR_MODE, request.method,
+                request.full_path, request.remote_addr)
+            if DETECTOR_MODE == "enforce":
+                abort(403)
 
     # 에러 핸들러 등록
     @app.errorhandler(404)

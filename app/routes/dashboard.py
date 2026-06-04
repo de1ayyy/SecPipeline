@@ -1,6 +1,7 @@
 from flask import Blueprint, session, redirect, url_for, render_template
 from app.models import get_db
 from app.services.stats import get_summary, get_weekly_hours, get_subject_distribution, get_recent_logs
+from app.ml import detector
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -27,7 +28,8 @@ def dashboard():
         'summary': get_summary(user_id),
         'weekly': get_weekly_hours(user_id),
         'distribution': get_subject_distribution(user_id),
-        'recent_logs': get_recent_logs(user_id)
+        'recent_logs': get_recent_logs(user_id),
+        'security': detector.get_security_stats()  # 보안 ML 탐지 위젯 (MLSecOps)
     }
 
     # ✅ Fix-03b 패턴 보존 (HTML을 dashboard.html로 분리)
