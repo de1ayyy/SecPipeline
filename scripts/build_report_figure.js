@@ -242,6 +242,21 @@ C(bullet("신설 ml-train 잡: 의존성 설치 → seed_attacks.py(데이터 �
 C(bullet("품질 게이트(fail-fast): 우승 모델의 macro-F1이 0.80 미만이면 ml-train 잡이 실패하여 이후 빌드·배포가 진행되지 않는다. DevSecOps의 보안 게이트와 동일한 원칙을 모델 품질에 적용한 것으로, 성능이 나쁜 모델이 배포되는 것을 자동으로 막는다."));
 C(bullet("의존성 연결: build-and-scan 잡이 ml-train을 needs로 받아 게이트를 통과한 모델 artifact를 내려받아 Docker 이미지에 포함한 뒤, Trivy 스캔 → deploy(Render Deploy Hook) → DAST(OWASP ZAP) 순으로 이어진다."));
 C(bullet("PR 안전성: deploy·dast 잡은 ‘main 브랜치 push’ 조건이 걸려 있어 PR에서는 자동으로 skip된다. 따라서 PR 단계에서는 배포 없이 보안·학습·빌드 검증만 수행되어 CI가 불필요하게 실패하지 않는다."));
+C(H2("주요 잡(Job)별 단계 설명"));
+C(P("워크플로는 9개의 잡(job)으로 구성되며, 각 잡은 actions/checkout으로 코드를 받은 뒤 자신의 검사를 수행한다. 잡 간 실행 순서는 needs(의존)로 보장되고, 앞 단계가 실패하면 뒤 단계는 실행되지 않는다(fail-fast). 각 잡의 역할과 핵심 단계는 다음과 같다.", {}));
+C(bullet("secret-scan (Gitleaks): 전체 커밋 히스토리를 스캔해 하드코딩된 시크릿이 있으면 실패. 비밀 유출을 커밋 단계에서 차단."));
+C(bullet("dependency-scan (pip-audit): requirements.txt 의존성의 알려진 취약점(CVE)을 검사하고 결과(JSON)를 artifact로 업로드."));
+C(bullet("sast (Semgrep + Bandit): app/ 소스를 정적 분석해 SQLi·취약 패턴을 탐지하고 결과 업로드."));
+C(bullet("unit-test (pytest) — 테스트 자동화: 의존성 설치 후 pytest tests/ 실행(JUnit XML). 단위 테스트 15개가 통과해야 다음 단계 진행."));
+C(bullet("ml-train — 학습 자동화 + 품질 검증: 의존성 설치 → seed_attacks.py → app.ml.train(MLflow 기록) → eval_gate.py(macro-F1 게이트) → 모델·metrics·mlruns artifact 업로드."));
+C(bullet("build-and-scan — 빌드 자동화: 앞 잡 통과를 needs로 받아 게이트 통과 모델 artifact를 내려받아 docker build로 이미지 생성 후 Trivy 스캔. 품질 검증된 모델이 포함된 이미지만 생성."));
+C(bullet("dockerfile-lint (Hadolint): Dockerfile 베스트프랙티스·보안 규칙 린트."));
+C(bullet("deploy — 배포 자동화: main push에서만 실행. Render GitHub 자동배포가 주 경로, Deploy Hook은 보조(훅 실패에도 잡 통과 가드)."));
+C(bullet("dast (OWASP ZAP): 배포 후 운영 URL을 동적 점검(Baseline Scan)해 런타임 취약점을 보완."));
+C(H2("테스트·빌드·배포 자동화 여부 및 방식"));
+C(P("세 자동화가 모두 ‘push 한 번’으로 사람 개입 없이 수행된다. (1) 테스트 자동화 — unit-test 잡이 매 push/PR마다 pytest를 실행해 회귀를 막는다. (2) 빌드 자동화 — build-and-scan 잡이 Dockerfile로 이미지를 생성하고 Trivy 스캔까지 한다. (3) 배포 자동화 — deploy 잡과 Render GitHub 연동으로 main 반영 시 자동 배포된다. 여기에 더해 일반 CI/CD(테스트·빌드·배포)를 넘어 모델 ‘학습 자동화’와 ‘재학습(workflow_dispatch)’까지 같은 파이프라인에 포함해 MLOps를 자동화한 점이 특징이다.", {}));
+C(H2("실행 결과"));
+C(P("main 병합 후 트리거된 워크플로에서 9개 잡(secret-scan·dependency-scan·sast·unit-test·ml-train·build-and-scan·dockerfile-lint·deploy·dast)이 모두 성공(초록)했다. ml-train 로그에는 두 모델의 macro_f1과 게이트 ‘PASS’가 출력되고, build-and-scan은 게이트 통과 모델을 포함해 이미지를 빌드하며, deploy·dast까지 정상 종료되어 배포·동적점검이 자동으로 이어졌다. 즉 push만으로 보안검사→테스트→학습·품질검증→빌드→배포→동적점검이 끊김 없이 자동 수행됨을 확인했다(아래 그림 5·6 및 17절 종단 그림).", {}));
 C(...fig({
   caption: "GitHub Actions 전체 잡 통과(초록) 결과",
   cmd: ["브라우저에서 " + REPO + "/actions → 최근 실행 클릭"],
