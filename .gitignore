@@ -220,5 +220,5 @@ data/requests.csv
 .DS_Store
 ~$*.docx
 
-# 보고서 그림 자동생성물(재생성 가능)
-docs/figures/
+# 문서/보고서는 GitHub에 올리지 않음(과제 산출물·미들텀 자료 등 로컬 보관)
+docs/
