@@ -134,6 +134,9 @@ C(mono("$ pip install -r requirements.txt  # 최초 1회 의존성 설치", { af
 
 // ════════════ 1. 프로젝트 개요 ════════════
 C(H1("1. 프로젝트 개요"));
+C(P("중간 프로젝트에서 구축한 SecPipeline은 Flask 기반 학습기록 웹 애플리케이션에 DevSecOps 5-Gate 보안 파이프라인(시크릿 탐지·의존성 취약점·정적분석(SAST)·컨테이너 취약점·Dockerfile 린트)을 결합하여, 코드를 push하면 보안 검사가 자동으로 수행되고 통과해야만 배포되는 CI/CD를 완성한 프로젝트였다. 기말 프로젝트에서는 이 기반 위에 ML을 ‘추가’하는 데서 멈추지 않고, 모델의 전 생애주기 — 데이터 준비 → 학습 → 평가(품질 게이트) → 배포 → 재학습 → 롤백 — 를 자동화하고 추적·관리하는 MLflow 기반 MLOps 파이프라인을 직접 설계·구축하는 것을 목표로 삼았다."));
+C(P("ML 주제로는 프로젝트의 정체성(DevSecOps)과 일관되도록 ‘보안 목적의 ML’, 즉 악성 HTTP 요청 탐지를 선택했다. 학습기록 분류와 같이 도메인과 무관한 ML을 붙이는 대신, 들어오는 요청을 정상/공격(SQL 인젝션·XSS·경로순회·명령주입)으로 분류하는 모델을 서비스에 결합함으로써 기존 DevSecOps를 MLSecOps(AI for DevSecOps)로 자연스럽게 확장했다. 이 방향은 CI 워크플로 주석에 인용한 Fu et al.(2024) ‘AI for DevSecOps’의 문제의식과도 부합한다."));
+C(P("따라서 본 보고서는 ‘기능이 동작한다’를 넘어 과제가 강조하는 세 가지 — ① 지속적인 개발 과정(SPEC 선설계 후 11단계 원자적 커밋), ② 모델 및 데이터 관리(MLflow 실험·버전 추적, 합성 데이터 v1→v2 관리), ③ 자동화된 운영 파이프라인(CI에 학습·품질 게이트·배포를 통합) — 을 어떻게 설계하고 운영했는지를 중심으로 서술한다.", { after: 140 }));
 C(bullet("프로젝트 이름: SecPipeline (DevSecOps + MLSecOps 통합)"));
 C(bullet("프로젝트 목적: 중간 프로젝트의 Flask 학습기록 앱 + DevSecOps 5-Gate 보안 파이프라인 위에, 보안 목적의 ML 기능(악성 HTTP 요청 탐지)과 MLflow 기반 MLOps(실험관리·버전관리·재학습·배포·운영)를 직접 설계·구축한다. 단순 모델 학습이 아니라 Git→CI/CD→Docker→MLflow→Deploy 전 과정을 자동으로 연결하고 운영하는 것이 목표다."));
 C(bullet("GitHub 주소(public): " + REPO + "   (Pull Request: " + PR + ")"));
@@ -158,22 +161,24 @@ C(...fig({
 
 // ════════════ 2. 소프트웨어 주요 기능 ════════════
 C(H1("2. 소프트웨어 주요 기능"));
+C(P("소프트웨어는 ‘사용자에게 제공하는 서비스’와 ‘보안 ML 기능’ 두 축으로 구성되며, 두 축은 책임이 분리되어 있되 요청 처리 경로의 한 지점(미들웨어)에서 결합된다. 이렇게 분리하면 ML 모델을 교체하거나 끄더라도 서비스 로직에는 영향이 없어 운영 안정성이 높다.", {}));
 C(H2("1) 사용자 핵심 기능 (서비스)"));
 C(bullet("회원가입/로그인(세션 기반)"));
 C(bullet("학습기록 CRUD: 제목·내용·학습시간·과목으로 기록 생성/조회/수정/삭제"));
 C(bullet("과목 관리, 검색, 내보내기(export), 대시보드(통계 + 보안 이벤트 위젯)"));
 C(H2("2) ML 모델이 사용되는 위치"));
-C(bullet("Flask @before_request 미들웨어(app/__init__.py): 모든 HTTP 요청이 라우트에 닿기 전에 ML 모델로 악성 여부를 스코어링한다."));
-C(bullet("기본 shadow 모드는 탐지·로깅만, DETECTOR_MODE=enforce면 악성 요청을 403으로 차단한다."));
-C(bullet("탐지 결과는 운영 로그(logs/secpipeline.log)와 대시보드 ‘보안 이벤트’ 위젯에 반영된다."));
+C(P("ML 모델은 Flask의 @before_request 훅(app/__init__.py)에 연결되어 있다. 모든 HTTP 요청이 각 라우트(뷰 함수)에 도달하기 전에 단일 지점에서 모델로 스코어링되므로, 라우트마다 보안 코드를 중복 삽입할 필요 없이 애플리케이션 표면 전체를 한 번에 보호할 수 있다. 이는 ‘선택지점(choke point)에서의 방어’라는 보안 설계 원칙을 따른 것이다.", {}));
+C(bullet("기본 동작은 shadow 모드: 악성으로 판정해도 차단하지 않고 탐지·로깅·집계만 수행한다(데모/운영 안정성 확보)."));
+C(bullet("환경변수 DETECTOR_MODE=enforce로 전환하면 악성 요청을 HTTP 403으로 즉시 차단한다. 모델 교체 없이 운영 정책만 바꿀 수 있는 ‘운영 스위치’ 역할을 한다."));
+C(bullet("탐지 결과는 운영 로그(logs/secpipeline.log)에 경보로 남고, 대시보드 ‘보안 이벤트’ 위젯에 누적·카테고리·최근 이벤트로 집계되어 사람이 모니터링할 수 있다."));
 C(H2("3) 입력 데이터와 출력 결과"));
-C(bullet("입력: HTTP 요청의 method + path + query + body 를 하나의 문자열로 정규화(URL 디코드, 소문자화)"));
-C(bullet("출력: 라벨(benign / sqli / xss / path_traversal / cmdi) + 신뢰도(0~1)"));
-C(P("→ 서비스(학습기록 앱)와 ML 기능(요청 보안 분류)은 책임이 분리되며 미들웨어 한 지점에서 결합된다.", {}));
-C(score("애플리케이션 및 ML 기능 구성(10)"));
+C(P("입력은 HTTP 요청의 method·path·query·body를 하나의 문자열로 합친 뒤 정규화한다. 정규화 단계에서 URL 인코딩(%2f, %3c 등)을 2회까지 디코드하여 인코딩으로 우회하려는 페이로드를 드러내고, 소문자화로 대소문자 변형을 흡수한다. 이 정규화 함수(app/ml/data.py의 normalize_request)는 학습과 실시간 추론이 동일하게 사용하여 학습-서빙 간 전처리 불일치(training-serving skew)를 원천 차단한다.", {}));
+C(bullet("출력: 라벨(benign / sqli / xss / path_traversal / cmdi) + 신뢰도(0~1, predict_proba의 최댓값). 라벨이 공격이고 신뢰도가 임계값 이상이면 경보로 처리한다."));
+C(score("애플리케이션 및 ML 기능 구성(10) — ML이 실제 서비스(요청 처리 경로)와 연결되어 동작"));
 
 // ════════════ 3. 실행 환경 ════════════
 C(H1("3. 실행 환경"));
+C(P("개발은 macOS에서, 실행은 컨테이너(Linux) 기준으로 통일했고, 배포는 Render의 Linux 환경을 사용한다. 어느 환경에서도 동일하게 재현되도록 ML 의존성(scikit-learn·pandas·matplotlib·joblib)을 정확한 버전으로 고정(pin)했다. 특히 학습된 모델(.pkl)은 scikit-learn 버전에 민감하므로, CI가 매번 최신 버전을 설치해 모델 로딩이 깨지는 일이 없도록 scikit-learn==1.9.0으로 고정한 점이 재현성의 핵심이다.", {}));
 C(table([2600, 6706], [
   [{ t: "구분" }, { t: "내용" }],
   ["개발/실행 OS", "macOS(Darwin) / 컨테이너 Linux(python:3.12-slim) / 배포 Render Linux"],
@@ -188,11 +193,11 @@ C(score("Docker 및 실행 환경 구성(5) — 버전 핀으로 재현성 확�
 
 // ════════════ 4. 전체 MLOps 파이프라인 구조 ════════════
 C(H1("4. 전체 MLOps 파이프라인 구조"));
-C(P("기존 DevSecOps 5-Gate는 그대로 두고, ML 단계(MLSecOps)를 추가해 한 파이프라인으로 통합했다. 네 가지 흐름으로 설명한다.", {}));
-C(bullet("코드 변경 흐름: git commit → push/PR → GitHub Actions 자동 트리거"));
-C(bullet("모델 학습 흐름: seed_attacks(데이터) → train(MLflow 로깅) → eval_gate(품질 게이트, macro-F1≥0.80)"));
-C(bullet("모델 등록/반영 흐름: 우승 모델 models/attack_clf.pkl 저장 → Docker 이미지에 COPY → 배포"));
-C(bullet("서비스 운영 흐름: before_request 탐지 → 로그/대시보드 → (enforce 시 403 차단)"));
+C(P("핵심 설계 원칙은 ‘기존 DevSecOps 5-Gate는 손대지 않고, ML 단계(MLSecOps)를 같은 워크플로에 추가하여 하나의 파이프라인으로 통합한다’는 것이다. 그 결과 보안 검증과 모델 운영이 분리된 두 시스템이 아니라, Git→CI/CD→Docker→MLflow→Deploy로 이어지는 단일 흐름 안에서 함께 동작한다. 코드 한 줄 또는 모델 데이터를 바꿔 push하면, 보안 5-Gate와 모델 학습·품질 게이트가 모두 자동으로 수행되고, 통과한 모델이 이미지에 담겨 배포되며, 운영 중에는 그 모델이 실시간으로 요청을 탐지한다. 아래 네 가지 흐름으로 나누어 설명한다.", {}));
+C(bullet("코드 변경 흐름: 개발자가 git commit → push(또는 PR) → GitHub Actions가 자동 트리거되어 보안 5-Gate + 단위테스트 + 모델 학습이 병렬 실행된다."));
+C(bullet("모델 학습 흐름: seed_attacks.py로 학습 데이터를 생성 → train.py가 두 모델을 학습하며 MLflow에 기록 → eval_gate.py가 우승 모델의 macro-F1이 0.80 미만이면 파이프라인을 중단(fail-fast)한다. 즉 ‘품질이 보장된 모델만’ 다음 단계로 넘어간다."));
+C(bullet("모델 등록/반영 흐름: 게이트를 통과한 우승 모델(models/attack_clf.pkl)이 artifact로 업로드되고, build 잡이 이를 내려받아 Docker 이미지에 COPY한다. 이미지가 곧 ‘모델이 포함된 배포 단위’가 된다."));
+C(bullet("서비스 운영 흐름: 배포된 컨테이너에서 before_request 미들웨어가 모델을 로드해 매 요청을 탐지하고, 결과를 로그·대시보드로 노출한다. 운영 중 새 공격 패턴이 보이면 재학습(v2)→비교→반영 또는 롤백으로 사이클이 순환한다."));
 C(P("[CI 잡 그래프(텍스트)]", { bold: true }));
 ["secret-scan · dependency-scan · sast · unit-test · ml-train",
  "        └─(모두 통과)→ build-and-scan(모델 포함) → deploy(Render) → dast(ZAP)"].forEach((l) => C(mono(l)));
@@ -207,9 +212,10 @@ C(...fig({
 
 // ════════════ 5. Git 기반 개발 과정 ════════════
 C(H1("5. Git 기반 개발 과정"));
-C(bullet("개발 흐름: SPEC.md에 11단계 계획을 먼저 수립 → 단계별 구현→로컬 검증→커밋 반복."));
-C(bullet("커밋 전략: 한 커밋 = 한 단계(원자적). 메시지는 ‘type(scope): 요약’ + 본문(변경/검증) 규칙."));
-C(bullet("브랜치: main 보호, 작업은 feature/mlops-security 브랜치에서 진행 후 Pull Request로 병합."));
+C(P("무계획적으로 코드를 쌓지 않고, 먼저 SPEC.md에 전체 작업을 11단계로 분해한 설계 문서를 작성한 뒤(설계 우선), 각 단계를 ‘구현 → 로컬 검증 → 커밋’ 순서로 진행했다. 이렇게 하면 개발 과정 자체가 Git 이력에 단계별로 또렷하게 남아, 어떤 의도로 무엇을 어떤 순서로 만들었는지가 커밋만 봐도 드러난다.", {}));
+C(bullet("커밋 전략: ‘한 커밋 = 한 단계(원자적)’ 원칙. 메시지는 Conventional Commits 형식(feat/test/ci/build/docs 등 type(scope): 요약)으로 작성하고, 본문에 변경 내용과 검증 결과를 함께 적어 추적성을 높였다."));
+C(bullet("브랜치 전략: main을 안정 브랜치로 두고, 모든 작업은 feature/mlops-security 브랜치에서 진행한 뒤 Pull Request(#5)로 리뷰·병합한다. 덕분에 main은 항상 배포 가능한 상태를 유지한다."));
+C(bullet("모델 변경 이력 관리: 모델 파일(models/attack_clf.pkl)도 Git으로 추적하여, 어느 커밋에서 모델이 바뀌었는지(예: Step 4=v1 최초, Step 10=v2)가 git log로 남아 롤백의 근거가 된다."));
 C(P("실제 커밋 이력(요약):", { bold: true }));
 C(table([1500, 7806], [[{ t: "단계" }, { t: "내용" }],
   ["Step 1", "SPEC·의존성·ML 패키지 골격"], ["Step 2", "합성 공격/정상 데이터 생성기"], ["Step 3", "데이터 로더 + 공유 정규화"],
@@ -227,11 +233,12 @@ C(...fig({
 
 // ════════════ 6. CI/CD 구성 ════════════
 C(H1("6. CI/CD 구성"));
-C(bullet("GitHub Actions(.github/workflows/devsecops.yml): push/PR 시 자동 실행, 수동 재학습용 workflow_dispatch 포함."));
-C(bullet("기존 5-Gate(보안): Gitleaks(시크릿)·pip-audit(의존성)·Semgrep+Bandit(SAST)·Trivy(컨테이너)·Hadolint(Dockerfile)."));
-C(bullet("추가된 ml-train 잡: 데이터 생성 → 학습(MLflow) → 품질 게이트(eval_gate) → 모델/메트릭/mlruns artifact 업로드."));
-C(bullet("build-and-scan: ml-train을 needs로 받아 게이트 통과 모델을 내려받아 이미지에 포함 → deploy(Render) → DAST(ZAP)."));
-C(bullet("PR 단계에서는 deploy/dast가 skip되어 CI가 깨지지 않고, main push에서만 배포가 동작한다."));
+C(P("CI/CD는 GitHub Actions(.github/workflows/devsecops.yml) 하나로 운영한다. push와 PR에서 자동 실행되며, 모델 재학습을 사람이 직접 트리거할 수 있도록 workflow_dispatch(수동 실행, 입력값 data_version 포함)도 추가했다. 워크플로는 기존 보안 5-Gate를 그대로 유지한 채 ML 단계만 얹는 방식으로 확장하여, 보안 검증과 모델 운영이 같은 자동화 안에서 함께 수행된다.", {}));
+C(bullet("기존 5-Gate(보안, 수정 없음): Gitleaks(시크릿)·pip-audit(의존성 취약점)·Semgrep+Bandit(SAST)·Trivy(컨테이너 취약점)·Hadolint(Dockerfile 린트) + pytest 단위테스트."));
+C(bullet("신설 ml-train 잡: 의존성 설치 → seed_attacks.py(데이터 생성) → app.ml.train(학습 + MLflow 로깅) → eval_gate.py(품질 게이트) → 모델·metrics·mlruns를 artifact로 업로드. 즉 ‘학습 자동화 + 모델 품질 자동 검증’을 CI 안에서 수행한다."));
+C(bullet("품질 게이트(fail-fast): 우승 모델의 macro-F1이 0.80 미만이면 ml-train 잡이 실패하여 이후 빌드·배포가 진행되지 않는다. DevSecOps의 보안 게이트와 동일한 원칙을 모델 품질에 적용한 것으로, 성능이 나쁜 모델이 배포되는 것을 자동으로 막는다."));
+C(bullet("의존성 연결: build-and-scan 잡이 ml-train을 needs로 받아 게이트를 통과한 모델 artifact를 내려받아 Docker 이미지에 포함한 뒤, Trivy 스캔 → deploy(Render Deploy Hook) → DAST(OWASP ZAP) 순으로 이어진다."));
+C(bullet("PR 안전성: deploy·dast 잡은 ‘main 브랜치 push’ 조건이 걸려 있어 PR에서는 자동으로 skip된다. 따라서 PR 단계에서는 배포 없이 보안·학습·빌드 검증만 수행되어 CI가 불필요하게 실패하지 않는다."));
 C(...fig({
   caption: "GitHub Actions 전체 잡 통과(초록) 결과",
   cmd: ["브라우저에서 " + REPO + "/actions → 최근 실행 클릭"],
@@ -253,9 +260,10 @@ C(...fig({
 
 // ════════════ 7. Docker ════════════
 C(H1("7. Docker 기반 환경 구성"));
-C(bullet("베이스 python:3.12-slim, WORKDIR /app, 의존성 설치(--no-cache-dir)."));
-C(bullet("보안 하드닝: 비특권 appuser 실행(CWE-250 방어), /health HEALTHCHECK."));
-C(bullet("ML 연동: 학습된 models/attack_clf.pkl을 이미지에 COPY, MODEL_PATH·DETECTOR_MODE 환경변수."));
+C(P("애플리케이션과 실행 환경(파이썬 런타임·의존성·학습된 모델)을 하나의 컨테이너 이미지로 묶어, 어느 호스트에서도 동일하게 실행되도록 구성했다. 미들텀에서 적용한 보안 하드닝을 그대로 유지하면서, 기말에서는 ML 모델을 이미지에 포함하는 단계를 추가했다.", {}));
+C(bullet("베이스 이미지 python:3.12-slim, WORKDIR /app, 의존성은 캐시 없이 설치(--no-cache-dir)하여 이미지를 가볍게 유지."));
+C(bullet("보안 하드닝: 비특권 사용자 appuser로 실행하여 컨테이너 탈취 시 권한 상승을 막고(CWE-250 방어), HEALTHCHECK로 /health를 주기 점검해 비정상 컨테이너를 감지한다. 운영 서버는 개발용 서버 대신 gunicorn을 사용한다."));
+C(bullet("ML 연동: 게이트를 통과한 models/attack_clf.pkl을 이미지에 COPY하고, MODEL_PATH(모델 경로)·DETECTOR_MODE(shadow/enforce)를 환경변수로 분리해 코드 수정 없이 운영 정책을 바꿀 수 있게 했다. 모델 파일이 없으면 앱이 탐지를 끄고 정상 기동(graceful fallback)하므로 컨테이너가 죽지 않는다."));
 C(...fig({
   caption: "Docker 이미지 빌드 성공",
   cmd: ["docker build -t studylog ."],
@@ -278,10 +286,9 @@ C(...fig({
 
 // ════════════ 8. ML 모델 구성 ════════════
 C(H1("8. ML 모델 구성"));
-C(bullet("사용 데이터: 합성 HTTP 요청(scripts/seed_attacks.py). 정상 + 4개 공격 카테고리를 균형(카테고리당 200건, 총 1000건)으로 생성."));
-C(bullet("모델 종류: TF-IDF(char n-gram) + ① LogisticRegression, ② MultinomialNB 두 가지를 학습해 비교."));
-C(bullet("학습 코드: app/ml/train.py — 두 모델을 각각 MLflow run으로 기록, macro-F1 기준 우승 모델을 attack_clf.pkl로 export."));
-C(bullet("평가 지표: 주지표 macro-F1, 보조 accuracy, 카테고리별 F1."));
+C(P("사용 데이터: 실서비스의 study_logs에는 공격 트래픽이 없으므로, 학습 데이터는 scripts/seed_attacks.py로 합성한다. 정상 요청(앱의 실제 경로와 평범한 파라미터)과 4개 공격 카테고리(SQL 인젝션·XSS·경로순회·명령주입)를 각 200건씩, 총 1,000건을 균형 있게 생성한다. 균형 분포로 만든 이유는 특정 클래스에 치우치지 않게 하여 macro-F1(클래스별 F1의 평균) 평가가 의미를 갖도록 하기 위함이다.", {}));
+C(P("모델 종류와 피처: 입력이 짧은 요청 문자열이고 공격 페이로드는 토큰 경계가 불분명(예: ' OR 1=1--, ../../, <script>)하므로, 단어 단위 대신 문자 n-gram TF-IDF(char_wb, 2~4-gram)를 피처로 사용한다. 분류기는 LogisticRegression과 MultinomialNB 두 가지를 학습해 비교했다 — 서로 특성이 다른 두 알고리즘을 두고 더 나은 쪽을 데이터로 고르기 위함이다(MLflow 비교, 9절).", {}));
+C(P("학습 코드(app/ml/train.py)는 두 모델을 각각 MLflow run으로 기록하고, 테스트셋 macro-F1이 가장 높은 모델을 우승 모델로 선정해 models/attack_clf.pkl로 export하며, 요약 지표를 models/metrics.json에 저장한다. 평가 지표는 주지표 macro-F1, 보조로 accuracy와 카테고리별 F1을 사용한다.", {}));
 C(...fig({
   caption: "합성 학습 데이터 생성 결과 (라벨 균형 분포)",
   cmd: ["python scripts/seed_attacks.py"],
@@ -321,7 +328,12 @@ C(score("애플리케이션 및 ML 기능 구성(10)"));
 
 // ════════════ 9. MLflow 기반 실험 관리 (핵심) ════════════
 C(H1("9. MLflow 기반 실험 관리"));
-C(P("MLflow Tracking(로컬 파일 백엔드 mlruns/)으로 모든 학습 run을 기록한다. 실험명은 secpipeline-attack-detection이며, run마다 parameter·metric·artifact·tag를 남긴다. 아래 그림들의 캡처는 모두 같은 MLflow UI를 띄운 뒤 진행한다.", {}));
+C(P("모델을 ‘한 번 학습하고 끝’이 아니라 실험으로 관리하기 위해 MLflow Tracking을 도입했다. 백엔드는 과제 규모에 맞게 로컬 파일(mlruns/)로 단순화했고, 실험명은 secpipeline-attack-detection이다. 학습을 실행할 때마다(알고리즘별로, 그리고 데이터 버전별로) 별도의 run이 생성되며, 각 run에는 다음을 기록한다.", {}));
+C(bullet("parameter: model_type(logreg/nb), analyzer(char_wb), ngram_range(2~4), max_features, n_train/n_test — 어떤 설정으로 학습했는지 재현 가능하게 남긴다."));
+C(bullet("metric: macro_f1, accuracy, 그리고 카테고리별 f1_benign/f1_sqli/f1_xss/f1_path_traversal/f1_cmdi — 어느 공격 유형에서 약한지까지 추적한다."));
+C(bullet("artifact: 혼동행렬 이미지(cm_*.png), 분류 리포트(classification_report.txt), 학습된 모델(.pkl) — 실험 결과물을 그대로 보관한다."));
+C(bullet("tag: data_version(v1/v2), model_type — 알고리즘 비교(같은 데이터, 다른 모델)와 시간축 버전 비교(같은 모델, 다른 데이터)를 모두 가능하게 하는 핵심 메타데이터다."));
+C(P("우승 모델 선정 기준은 ‘테스트셋 macro-F1 최댓값’으로 명시적으로 정의했고, train.py가 이 기준으로 자동 선정한다. 모델 비교는 두 가지 축으로 이뤄진다 — (1) 같은 데이터에서 LogReg vs NB(알고리즘 비교), (2) v1 vs v2(데이터 변경에 따른 시간축 버전 비교, 11절). 아래 그림들의 캡처는 모두 같은 MLflow UI를 띄운 상태에서 진행한다.", {}));
 C(P("◆ MLflow UI 실행 방법 (이 절의 모든 캡처 공통):", { bold: true }));
 C(mono("$ export MLFLOW_ALLOW_FILE_STORE=true"));
 C(mono("$ mlflow ui --backend-store-uri \"file://$(pwd)/mlruns\" --port 5001"));
@@ -398,6 +410,7 @@ C(score("모델 등록·반영 (파이프라인 35, 추가점수 자동/수동 �
 
 // ════════════ 11. 재학습 / 모델 개선 (상세 시나리오) ════════════
 C(H1("11. 재학습 또는 모델 개선 과정"));
+C(P("MLOps의 핵심은 ‘한 번 만든 모델을 고정’하는 것이 아니라, 환경 변화에 따라 모델을 다시 학습하고 더 나은 버전으로 교체하거나, 문제가 생기면 되돌리는 사이클을 운영하는 것이다. 본 절에서는 ‘왜 재학습했는가 → 무엇을 바꿨는가 → 전후 성능이 어떻게 달라졌는가 → 어떻게 반영했는가’를 v1→v2 사례로 구체적으로 보인다.", {}));
 C(P("배경(왜 재학습했는가):", { bold: true }));
 C(bullet("운영 가정: 초기(v1) 모델 배포 후, URL 인코딩으로 우회하는 변형 공격(예: 이중 인코딩 ..%252f.., busybox 기반 명령주입, math 태그를 이용한 XSS)이 새로 관측되었다."));
 C(bullet("문제: v1 학습 데이터에는 이런 변형이 부족해, 특히 가벼운 모델인 NB가 일부 변형을 정상에 가깝게 분류하는 약점이 있었다(NB macro-F1 0.9798)."));
@@ -447,12 +460,13 @@ C(...fig({
   why: "재학습을 사람이 승인·트리거하는 수동 반영 방식을 실제로 사용함을 증빙",
   score: "재학습·자동화(10), 추가점수",
 }));
-C(P("모델 교체 결과: v2 우승 모델(LogReg)을 배포 모델로 반영(models/attack_clf.pkl 갱신·커밋). NB 계열은 0.9798→0.9899로 일반화가 개선됨을 확인.", {}));
+C(P("모델 교체 결과 및 해석: 신규 변형을 추가한 v2로 재학습한 결과, 가벼운 모델인 NB의 macro-F1이 0.9798→0.9899로 향상되어 새 패턴에 대한 일반화가 개선됨을 확인했다. LogReg는 두 버전 모두 최상위(1.0000)를 유지해 우승 모델 자리를 지켰고, 이 v2 우승 모델을 models/attack_clf.pkl로 갱신·커밋하여 배포에 반영했다. 데이터만 바꾸고 모델 구조·피처는 고정했기 때문에, 성능 변화의 원인을 ‘데이터 변경’으로 명확히 귀속할 수 있다(통제된 비교). 만약 v2가 회귀했다면 13절의 절차로 v1으로 롤백했을 것이다.", {}));
 C(score("재학습/개선 (MLflow 15, 추가점수 10)"));
 
 // ════════════ 12. 운영 로그 및 문제 대응 ════════════
 C(H1("12. 운영 로그 및 문제 대응"));
-C(bullet("서비스 로그: logs/secpipeline.log (RotatingFileHandler). 앱 기동/요청/에러를 기록."));
+C(P("운영 상태를 사후에 추적할 수 있도록, 애플리케이션은 RotatingFileHandler 기반 로깅 체계를 갖추고 있다(app/logger.py). 평상시에는 기동·요청·에러를 기록하고, ML 미들웨어가 악성 요청을 탐지하면 별도의 보안 경보를 남긴다. 이를 통해 ‘요청 → 모델 예측(탐지) → 로그/대시보드 반영’이라는 운영 흐름을 로그와 화면 양쪽에서 확인할 수 있다.", {}));
+C(bullet("서비스 로그: logs/secpipeline.log (RotatingFileHandler, 1MB×3 롤오버). 앱 기동/요청/에러를 기록."));
 C(bullet("예측(탐지) 요청 로그: 악성 판정 시 ‘SECURITY ALERT [라벨] conf=… mode=… METHOD path from=IP’ 형식."));
 C(bullet("모델 정보 확인: models/metrics.json(버전·우승모델·지표), 대시보드 ‘보안 이벤트’ 위젯(누적/카테고리/최근)."));
 C(P("아래 순서대로 캡처하면 ‘요청 → 탐지 → 로그/화면 반영’의 운영 흐름이 한눈에 증빙된다.", {}));
@@ -487,14 +501,14 @@ C(...fig({
   why: "탐지 결과가 운영 화면(대시보드)에 실시간 반영됨을 증빙",
   score: "애플리케이션·ML 기능(10), 운영(5), 추가점수",
 }));
-C(P("일부러 발생시킨 문제(실제 경험):", { bold: true }));
-C(bullet("문제: MLflow 3.13에서 파일 백엔드가 기본 차단되어 학습이 MlflowException으로 중단됨."));
-C(bullet("원인: MLflow 3.x가 file store를 maintenance mode로 막음.", 1));
-C(bullet("해결: train.py에서 mlflow import 전에 MLFLOW_ALLOW_FILE_STORE=true를 설정해 로컬 mlruns/ 유지.", 1));
+C(P("일부러 발생시킨 문제 + 실제 겪은 문제(원인·해결):", { bold: true }));
+C(P("(가) 의도적 공격 주입 — 정상 서비스에 SQLi/XSS/경로순회 페이로드를 직접 요청해 탐지가 동작하는지 검증했다. 결과적으로 세 유형 모두 즉시 탐지되어 경보 로그(라벨·신뢰도 포함)와 대시보드 집계에 반영됐다(위 그림). 이는 모델이 실제 운영 경로에서 작동함을 보여준다.", {}));
+C(P("(나) 실제 장애 — MLflow 3.13으로 학습 시 ‘파일 백엔드(mlruns/)가 maintenance mode로 차단됨’ 예외(MlflowException)로 학습이 중단됐다. 원인은 MLflow 3.x가 파일 스토어를 기본 비활성화했기 때문이다. 해결은 train.py에서 mlflow를 import하기 전에 환경변수 MLFLOW_ALLOW_FILE_STORE=true를 설정하여 로컬 파일 백엔드를 유지하도록 한 것이다. 이 경험은 의존성 버전 변화가 파이프라인을 깨뜨릴 수 있음을 보여주며, 이후 의존성 버전 핀(3절)의 동기가 되었다.", {}));
 C(score("배포·운영(5), 추가점수(운영 로그 분석)"));
 
 // ════════════ 13. 롤백 및 이전 모델 관리 ════════════
 C(H1("13. 롤백 및 이전 모델 관리"));
+C(P("새 모델이 항상 더 좋다는 보장은 없으므로, 운영에서는 ‘이전 모델로 즉시 되돌릴 수 있는 능력’이 중요하다. 본 프로젝트는 모델 파일을 Git으로 추적하고 CI artifact로도 보관하므로, 모델 교체를 ‘파일을 바꾼 커밋을 배포’하는 일로 단순화했고, 롤백 역시 ‘이전 커밋의 모델 파일로 되돌려 재배포’하는 일로 일관되게 처리된다.", {}));
 C(bullet("이전 모델 보관: Git 이력에 모델 파일이 버전별로 남는다(Step 4 커밋=v1 최초, Step 10 커밋=v2). CI는 ml-model artifact로도 모델을 보관."));
 C(bullet("버전 관리: MLflow의 data_version 태그 + scripts/compare_versions.py로 버전을 비교·식별."));
 C(bullet("되돌리는 방법: git checkout <v1-커밋> -- models/… 로 직전 모델 파일 복원 후 커밋·푸시 → CI 재배포(docs/rollback.md)."));
@@ -543,17 +557,19 @@ C(score("MLOps 파이프라인 완성도(35)"));
 
 // ════════════ 15. 문제 해결 경험 ════════════
 C(H1("15. 문제 해결 경험"));
-C(P("① MLflow 파일스토어 차단(12절) — import 전 MLFLOW_ALLOW_FILE_STORE 설정으로 해결.", {}));
-C(P("② 학습/추론 전처리 불일치 위험 — normalize_request를 app/ml/data.py 단일 함수로 두고 학습과 미들웨어가 공유하도록 설계해 분포 어긋남을 방지.", {}));
-C(P("③ 의존성 재현성 — CI가 매번 최신 버전을 설치해 검증 버전과 달라질 위험 → requirements를 정확 버전으로 핀(특히 모델 pickle 호환을 위해 scikit-learn 고정).", {}));
-C(P("④ MLflow UI 빈 화면 — 상대경로(file:./mlruns)로는 실험이 안 보여, 절대경로(file://$(pwd)/mlruns)로 실행하도록 정리.", {}));
+C(P("개발·운영 과정에서 실제로 부딪힌 문제와 해결을 정리한다. 모두 단순 버그가 아니라 ‘파이프라인을 견고하게 만드는 설계 결정’으로 이어진 사례다.", {}));
+C(P("① MLflow 파일스토어 차단(12절 상세): MLflow 3.x가 파일 백엔드를 막아 학습이 중단됨 → import 전 MLFLOW_ALLOW_FILE_STORE=true 설정으로 로컬 mlruns/ 유지. 의존성 메이저 변화가 파이프라인을 깨뜨릴 수 있음을 학습.", {}));
+C(P("② 학습/추론 전처리 불일치(training-serving skew) 위험: 학습 때와 실시간 탐지 때 요청을 다르게 전처리하면 정확도가 무너진다. 이를 막기 위해 정규화 로직을 app/ml/data.py의 normalize_request 단일 함수로 두고, 학습(train.py)과 미들웨어(detector.py)가 같은 함수를 공유하도록 설계했다.", {}));
+C(P("③ 의존성 재현성: CI가 실행 시점의 최신 패키지를 설치하면 내가 검증한 버전과 달라져, 특히 scikit-learn 버전 차이로 모델 pickle 로딩이 깨질 수 있다. requirements.txt를 정확한 버전으로 핀(scikit-learn==1.9.0 등)하여 로컬·CI·배포가 동일하게 재현되도록 했다.", {}));
+C(P("④ MLflow UI 빈 화면: --backend-store-uri file:./mlruns(상대경로)로는 실험이 보이지 않는 문제가 있었다. 절대경로 file://$(pwd)/mlruns로 실행해야 정상 표시됨을 확인하고 문서·명령을 그에 맞게 정리했다.", {}));
+C(P("⑤ 포트 충돌: macOS의 AirPlay가 5000번 포트를 점유해 Docker 컨테이너 실행이 실패했다. 호스트 포트를 5055로 바꿔(-p 5055:5000) 해결했다(환경 의존적 문제의 전형).", {}));
 C(score("추가점수(애플리케이션 복잡도·문제해결)"));
 
 // ════════════ 16. 느낀 점 ════════════
 C(H1("16. 느낀 점 및 개선 방향"));
-C(bullet("MLOps 관점: 모델 성능보다 ‘데이터→학습→게이트→배포→재학습→롤백’이 자동으로 이어지는 운영 사이클 설계가 핵심임을 체감."));
-C(bullet("개선하고 싶은 부분: 합성 데이터 대신 실제 트래픽/공격 로그로 재학습, MLflow Model Registry 도입, 임계값·오탐률 튜닝, 탐지 지표의 운영 모니터링."));
-C(bullet("수업 피드백: (자유 작성)"));
+C(P("MLOps 관점에서 배운 점: 이번 과제를 통해 ‘좋은 모델을 만드는 것’과 ‘모델을 운영 가능하게 만드는 것’이 별개의 역량임을 체감했다. 실제로 가장 어려운 부분은 모델 알고리즘이 아니라, 데이터→학습→품질 게이트→배포→재학습→롤백이 끊김 없이 자동으로 이어지도록 파이프라인을 설계하고, 학습-서빙 일치·재현성·버전 관리 같은 ‘운영의 함정’을 막는 일이었다. 기존 DevSecOps(보안 게이트) 사고방식을 모델 품질 게이트에 그대로 적용할 수 있었던 점이 특히 인상적이었다.", {}));
+C(P("개선하고 싶은 부분: ① 합성 데이터의 한계를 넘어 실제 트래픽·공격 로그로 재학습하고 임계값·오탐률을 튜닝, ② MLflow Model Registry를 도입해 모델 stage(Staging/Production) 전환으로 반영·롤백을 더 체계화, ③ 탐지 지표(탐지율·오탐율)를 운영 대시보드에서 지속 모니터링, ④ 데이터/모델 드리프트 감지를 추가해 재학습 트리거를 자동화하는 것이다.", {}));
+C(P("수업 피드백: (자유 작성)", { color: "808080" }));
 
 // ════════════ 참고 자료 ════════════
 C(H1("참고 자료"));
